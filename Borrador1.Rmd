@@ -86,7 +86,7 @@ Pob_mon = data.frame(lapply(Pob_mon, function(variables) {if (is.character(varia
 ```
 
 ```{r}
-colnames(Pob_mon) = c("PROVINCIA","Nivel de proveza")
+colnames(Pob_mon) = c("PROVINCIA","Nivel de pobreza")
 ```
 
 
