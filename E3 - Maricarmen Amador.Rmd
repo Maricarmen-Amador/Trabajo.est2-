@@ -1,0 +1,229 @@
+---
+title: "Entrega 3 - Maricarmen Amador"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(rio)
+library(ggplot2)
+library(tidyr)
+library(kableExtra)
+library(gt)
+library(dplyr)
+library(corrplot)
+library(psych)
+library(polycor)
+library(ggcorrplot)
+library(matrixcalc)
+library(GPArotation)
+```
+
+```{r}
+link= "https://raw.githubusercontent.com/Maricarmen-Amador/Trabajo.est2-/refs/heads/main/E3%20-%20Nueva%20base.csv"
+data = read.csv(link)
+```
+
+Trabajo individual 
+=======================================================================
+Row 
+-------------------------------------
+
+### Variables dento del análisis
+
+```{r}
+names(data)
+```
+
+### Tipo de variables
+```{r}
+class(data$DEPARTAMENTO)
+class(data$PROVINCIA)
+class(data$UBIGEO)
+class(data$Esperanza_vida)
+class(data$Población)
+class(data$P_agua_luz)
+class(data$Urbano)
+class(data$Año_estud)
+class(data$P_alfabeta)
+class(data$Ing_fam)
+class(data$P_asegurada)
+class(data$P_presu_usado)
+class(data$Nivel_pobreza)
+class(data$Indice_corr)
+```
+
+
+Row 
+-------------------------------------
+### *Descripción del tema*
+Factores socioeconómicos que pueden afectar la esperanza de vida de los pobladores de las 196 provincias de Perú. En este análisis se usan variables como acceso a servicios básicos (agua y luz), nivel de pobreza, analfabetismo, afiliación a seguros de salud, corrupción, ingreso mensual familiar y ejecución presupuestal para entender cómo influyen en la esperanza de vida al nacer.
+
+Variable Dependiente
+=======================================================================
+
+Row 
+-------------------------------------
+
+### Variable Dependiente 
+La esperanza de vida al nacer es una medida estadística que estima el número promedio de años que viviría una persona si se mantuvieran constantes las tasas de mortalidad por edad observadas en un determinado año. Es un indicador fundamental de salud pública y calidad de vida, utilizado para evaluar el desarrollo social y económico de un país o región
+
+### Estadísticos de la VD
+
+```{r}
+resumen = data %>%
+  summarise(
+    Media = round(mean(Esperanza_vida, na.rm = TRUE), 2),
+    Mediana = round(median(Esperanza_vida, na.rm = TRUE), 2),
+    Desviación = round(sd(Esperanza_vida, na.rm = TRUE), 2),
+    Variación = round(var(Esperanza_vida, na.rm = TRUE), 2),
+    Mínimo = round(min(Esperanza_vida, na.rm = TRUE), 2),
+    Máximo = round(max(Esperanza_vida, na.rm = TRUE), 2)
+  )
+
+resumen %>%
+  kbl(caption = "Resumen Estadístico de la Esperanza de Vida") %>%
+  kable_classic(full_width = FALSE, html_font = "Arial", position = "center")
+```
+
+Row 
+-------------------------------------
+
+### Box plot
+```{r}
+boxplot(data$Esperanza_vida)
+outliers <- boxplot(data$Esperanza_vida)$out
+title(main = "Años de vida")
+title(xlab = "Años", ylab = "Box plot de esperanza de vida")
+```
+
+### Histograma 
+```{r}
+ggplot(data.frame(data), aes(x = Esperanza_vida)) +
+       geom_histogram(aes(y = after_stat(density)),
+                      color = "gray", fill = "white") +
+       geom_density(fill = "black", alpha = 0.5) + ggtitle("Histograma y densidad de Esperanza de vida") + xlab("Años de esperanza de vida") + ylab("Densidad")
+```
+
+Regresión Gauss
+=======================================================================
+
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------
+
+### Modelo sin escalar
+```{r}
+md1= lm(Esperanza_vida ~ Población + Urbano + P_agua_luz + Año_estud + P_alfabeta + P_asegurada + Nivel_pobreza + P_presu_usado + Ing_fam + Indice_corr, data=data)
+summary(md1)
+```
+
+
+### Modelo escalado
+```{r}
+md2= lm(scale(Esperanza_vida) ~ scale(Población) + scale(Urbano) + scale(P_agua_luz) + scale(Año_estud) + scale(P_alfabeta) + scale(P_asegurada) + scale(Nivel_pobreza) + scale(P_presu_usado) + scale(Ing_fam)  + scale(Indice_corr), data = data)
+summary(md2)
+```
+
+> No hay mucha diferencia, pero es importante para ver el verdadero impacto de cada variable
+
+Análisis Factorial 
+=======================================================================
+
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------
+### Cuadro de correlaciones
+
+```{r}
+columnas_excluir = c("UBIGEO", "DEPARTAMENTO", "PROVINCIA")
+columnas_seleccionadas = setdiff(names(data), columnas_excluir)
+data_filtrada = data[, columnas_seleccionadas]
+matriz_correlaciones = hetcor(data_filtrada)$correlations
+matriz_correlaciones_redondeada <- round(matriz_correlaciones, 2)
+kable(matriz_correlaciones_redondeada, 
+      caption = "Matriz de Correlaciones", 
+      format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+
+### KMO test 
+
+```{r}
+kmo_resultado = KMO(data_filtrada)
+print(kmo_resultado)
+```
+
+```{r}
+excluir = c("P_agua", "P_presu_usado", "PROVINCIA", "UBIGEO", "Urbano", "P_agua_luz") 
+seleccionada = setdiff(names(data_filtrada), excluir)
+dataKMO = data_filtrada[, seleccionada]
+
+kmo_resultado = KMO(dataKMO)
+print(kmo_resultado)
+```
+> Para que tenga significacia en el segundo cuadro solo están las variables que obtuvieron un valor mayor a 0.8
+
+### Matriz adecuada 
+
+Identidad 
+```{r}
+cortest.bartlett(matriz_correlaciones,n=nrow(dataKMO))$p.value>0.05
+```
+
+Singular 
+```{r}
+is.singular.matrix(matriz_correlaciones)
+```
+
+### Redimensionar 
+
+```{r}
+fa.parallel(data_filtrada, fa = 'fa',correct = T,plot = F)
+```
+> Sugiere 1 división
+
+### Redimensión
+
+```{r}
+resfa <- fa(data_filtrada, nfactors = 1, cor = 'mixed', rotate = "varimax", fm="minres")
+cargas_factoriales <- round(resfa$loadings[,0:1], 3) 
+
+kable(cargas_factoriales, 
+      caption = "Cargas Factoriales del Análisis Factorial", 
+      format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+### Resultados EFA 
+```{r}
+fa.diagram(resfa,main = "Resultados del EFA")
+```
+
+Row 
+-------------------------------------
+### Figura Corplot
+
+```{r}
+ggcorrplot(matriz_correlaciones, title = "Matriz correlación")
+```
+> Solo se trabaja con las variables que tengan un mayor impacto
+
+Conclusiones 
+=======================================================================
+
+Row 
+-------------------------------------
+### Conclusión
+Las variables no se consideran significativas para explicar la variable dependiente. En el análisis múltivariado se ve como solo dos del total de variables tienen significancia, esto puede indicar que existen otros factores que no han sido considerados en este trabajo que tienen mayor inportancia. 
+
+En la parte de ánalisis del modelo presentado se puede ver que el p-valor global es bajo (2.688e-07), pero indica significancia. Como bien se ha mencionado, solo un par de variables son las responsables de que el modelo tenga significancia, estas variables son: **Años de estudio (Año_estud)** e **Ingreso familiar (Ing_fam)**. 
+
+La primera variable muestra una tendencia negativa. Esto es algo curioso debido a que se esperaría encontrar una relación positiva entre la cantidad de años de estudio y la esperanza de vida de una persona, y ayuda a pensar en otros factores que podrían estar afectando más la esperanza de vida que los años de educación. 
+
+La segunda variable tiene un coeficiente positivo. Esto confirma la idea de que a mayor ingreso familiar se espera una mayor esperanza de vida, lo cual es intuitivo, ya que mayores ingresos permiten mejor acceso a servicios de salud, alimentación y condiciones de vida.
+
+Por parte de las variables no significativas que se esperaba cuenten con significancia están las siguientes: **población, nivel de pobreza, corrupción, y acceso a agua y luz**. Esto se puede atribuir a un mal uso de las variables o a una mala estructura dentro de los datos estadísticos. Una variable considerbale es la **Población urbana (Urbano)** ya que se esperaría que el hecho de vivir en zonas urbanas tendría un efecto positivo en la cantidad de años de esperanza de vida debido al alcance y facilidaddes que ello implica en la población, pero esta suposición no es perceptible en este caso.
+
+...
